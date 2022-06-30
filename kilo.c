@@ -7,6 +7,14 @@
 
 struct termios orig_termios; /* Variável que guardará os atributos originais do terminal */
 
+void die(const char *s) {
+	perror(s);
+	exit(1);
+	/*
+	 * perror - stdio.h
+	 * exit - stdlib.h
+	*/
+}
 void disableRawMode() {
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
 }
@@ -33,21 +41,32 @@ void enableRawMode() {
 	 * ICANON - desliga a leitura de frase por frase, e, lemos por caracter
 	 * ISIG - Desliga os sinais SIGINT do CtrlD e SIGSTP do CtrlZ
 	*/ 
-	
+	raw.c_cc[VMIN] = 0;
+	raw.c_cc[VTIME] = 1;
+	/*
+	 * são index do control characters
+	 * O VMIN define o número mínimo de bytes de entrada necessários antes que o read possa retornar
+	 * Neste caso, o 0 significa assim que algum byte seja lido
+	 * O VTIME define o tempo máximo para que o read() dê retorno, neste caso 0.1 segundos
+	*/
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
 int main() {
 	enableRawMode();
 	
-	char c;
-	while (read(STDIN_FILENO, &c, 1) == 1 && c != 'q') { /* Lê um 1 byte por vez até o final e retorna o número de bytes lidos */
+	
+	while(1) {
+		char c = '\0';
+		read(STDIN_FILENO, &c, 1);
+		
 		if(iscntrl(c)) {
 			printf("%d\r\n", c);
 		} else {
 			printf("%d ('%c')\r\n", c, c);
 		}
+		if(c== 'q') break;
 	}
-
+	
 	return 0;
 }
