@@ -15,6 +15,18 @@ void enableRawMode() {
 	atexit(disableRawMode); /* Função interessante do stlib.h, "NA SAIDA", pois quebra implicitamente o fluxo do programa */
 	
 	struct termios raw = orig_termios;
+	raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+	/*
+	 * IXON - desabilita os sinais do CtrlS (impede os dados para o terminal) e CtrlQ (desfaz o CtrlS)
+	 * ICRNL - desabilita o CrtlM e CtrlJ, tendo em vista que Cr - carriage return 'r' e Nl - '\n'
+	 * Os demais sinalizadores não possuem um efeito observável
+	*/
+	raw.c_oflag &= ~(OPOST);
+	/*
+	 * OPOST - desativa a saída padrão do new line que é '\r\n' para apenas '\n'
+	*/
+	
+	raw.c_cflag |= (CS8);
 	raw.c_lflag &= ~(ECHO | ICANON | ISIG); 
 	/*
 	 * ECHO - impressão de teclas pressionadas na tela,
@@ -31,9 +43,9 @@ int main() {
 	char c;
 	while (read(STDIN_FILENO, &c, 1) == 1 && c != 'q') { /* Lê um 1 byte por vez até o final e retorna o número de bytes lidos */
 		if(iscntrl(c)) {
-			printf("%d\n", c);
+			printf("%d\r\n", c);
 		} else {
-			printf("%d ('%c')\n", c, c);
+			printf("%d ('%c')\r\n", c, c);
 		}
 	}
 
