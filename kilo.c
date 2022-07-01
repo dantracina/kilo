@@ -11,10 +11,18 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 /*** data ***/
-struct termios orig_termios; /* Variável que guardará os atributos originais do terminal */
 
+struct editorConfig {
+	struct termios orig_termios; /* Variável que guardará os atributos originais do terminal */
+};
+
+struct editorConfig E;
 /*** terminal ***/
+
 void die(const char *s) {
+	write(STDOUT_FILENO, "\x1b[2J", 4);
+	write(STDOUT_FILENO, "\x1b[H", 3);
+	
 	perror(s); /* A maioria das fç do std que falham definirá uma varíavel global errno, perror avalia essa variável e imprime uma msg para ela */
 	exit(1);
 	/*
@@ -23,14 +31,14 @@ void die(const char *s) {
 	*/
 }
 void disableRawMode() {
-	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1)
+	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == -1)
 		die("tcsetattr");
 }
 void enableRawMode() {
-	if (tcgetattr(STDIN_FILENO, &orig_termios) == -1) die("tcgetattr");
+	if (tcgetattr(STDIN_FILENO, &E.orig_termios) == -1) die("tcgetattr");
 	atexit(disableRawMode); /* Função interessante do stlib.h, "NA SAIDA", pois quebra implicitamente o fluxo do programa */
 	
-	struct termios raw = orig_termios;
+	struct termios raw = E.orig_termios;
 	raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
 	/*
 	 * IXON - desabilita os sinais do CtrlS (impede os dados para o terminal) e CtrlQ (desfaz o CtrlS)
@@ -66,7 +74,25 @@ char editorReadKey() {
 	while ( (nread = read(STDIN_FILENO, &c, 1)) != 1) {
 		if(nread == -1 && errno != EAGAIN) die("read");
 	}
+	
 	return c;	
+}
+/*** output ***/
+
+void editorDrawRows() {
+	int y;
+	for(y = 0; y < 24; y++) {
+		write(STDOUT_FILENO, "~\r\n", 3);
+	}
+}
+
+void editorRefreshScreen() {
+		write(STDOUT_FILENO, "\x1b[2J", 4); /* write e STDOUT_FILENO vem de unistd.h */
+		/* \x1b é um único byte, o de escape que em decimal é 27 */
+		write(STDOUT_FILENO, "\x1b[H", 3); /*reposiciona o cursor na primeiras linha e coluna */
+		
+		editorDrawRows();
+		write(STDOUT_FILENO, "\x1b[H", 3);
 }
 
 /*** input ***/
@@ -76,6 +102,8 @@ void editorProcessKeypress() {
 	
 	switch(c) {
 		case CTRL_KEY('q'):
+			write(STDOUT_FILENO, "\x1b[2J", 4);
+			write(STDOUT_FILENO, "\x1b[H", 3);
 			exit(0);
 			break;
 	}
@@ -85,6 +113,7 @@ int main() {
 	enableRawMode();
 	
 	while(1) {
+		editorRefreshScreen();
 		editorProcessKeypress();
 	}
 	
